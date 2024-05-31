@@ -40,11 +40,8 @@ std::set<MonitorType> strKeysToMonitorSet(const std::string& keys) {
 
 Presenter::Presenter(std::set<MonitorType> enabledMonitors,
         int yPos,
-        cv::Size graphSize,
         std::size_t historySize) :
             yPos{yPos},
-            graphSize{graphSize},
-            graphPadding{std::max(1, static_cast<int>(graphSize.width * 0.05))},
             historySize{historySize},
             distributionCpuEnabled{false},
             strStream{std::ios_base::app} {
@@ -53,26 +50,19 @@ Presenter::Presenter(std::set<MonitorType> enabledMonitors,
     }
 }
 
-Presenter::Presenter(const std::string& keys, int yPos, cv::Size graphSize, std::size_t historySize) :
-    Presenter{strKeysToMonitorSet(keys), yPos, graphSize, historySize} {}
+Presenter::Presenter(const std::string& keys, int yPos, std::size_t historySize) :
+    Presenter{strKeysToMonitorSet(keys), yPos, historySize} {}
 
 void Presenter::addRemoveMonitor(MonitorType monitor) {
     unsigned updatedHistorySize = 1;
-    if (historySize > 1) {
-        int sampleStep = std::max(1, static_cast<int>(graphSize.width / (historySize - 1)));
-        // +1 to plot graphSize.width/sampleStep segments
-        // add round up to and an extra element if don't reach graph edge
-        updatedHistorySize = (graphSize.width + sampleStep - 1) / sampleStep + 1;
-    }
     switch(monitor) {
         case MonitorType::CpuAverage: {
-            if (cpuMonitor.getHistorySize() > 1 && distributionCpuEnabled) {
-                cpuMonitor.setHistorySize(1);
-            } else if (cpuMonitor.getHistorySize() > 1 && !distributionCpuEnabled) {
+            if (historySize <= 0) {
                 cpuMonitor.setHistorySize(0);
-            } else { // cpuMonitor.getHistorySize() <= 1
-                cpuMonitor.setHistorySize(updatedHistorySize);
+            } else {
+                cpuMonitor.setHistorySize(historySize);
             }
+            std::cout << "CPU history size: " << cpuMonitor.getHistorySize() << std::endl;
             break;
         }
         case MonitorType::DistributionCpu: {
@@ -96,7 +86,6 @@ void Presenter::addRemoveMonitor(MonitorType monitor) {
             break;
         }
     }
-    std::cout << "CPU history size: " << cpuMonitor.getHistorySize() << std::endl;
 }
 
 void Presenter::handleKey(int key) {
@@ -168,8 +157,10 @@ std::vector<std::string> Presenter::reportMeans() const {
         std::ostringstream collectedDataStream;
         collectedDataStream << std::fixed << std::setprecision(1);
         collectedDataStream << "\tMean core utilization: ";
+        double meanSum = 0.0;
         for (double mean : cpuMonitor.getMeanCpuLoad()) {
             collectedDataStream << mean * 100 << "% ";
+            meanSum += mean * 100;
         }
         collectedData.push_back(collectedDataStream.str());
     }

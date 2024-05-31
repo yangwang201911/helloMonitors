@@ -4,7 +4,8 @@
 
 #include "query_wrapper.h"
 
-#include <Windows.h>
+#define NOMINMAX
+#include <windows.h>
 #include <system_error>
 
 QueryWrapper::QueryWrapper() {

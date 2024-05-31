@@ -5,18 +5,22 @@
 #include "monitors/cpu_monitor.h"
 
 #include <algorithm>
+#include <iostream>
 #ifdef _WIN32
+#define NOMINMAX
 #include "query_wrapper.h"
 #include <string>
+#include <thread>
+#include <chrono>
 #include <system_error>
 #include <PdhMsg.h>
-#include <Windows.h>
+#include <windows.h>
 
 namespace {
 const std::size_t nCores = []() {
         SYSTEM_INFO sysinfo;
         GetSystemInfo(&sysinfo);
-        return sysinfo.dwNumberOfProcessors;
+        return sysinfo.dwNumberOfProcessors + 1;
     }();
 }
 
@@ -24,7 +28,18 @@ class CpuMonitor::PerformanceCounter {
 public:
     PerformanceCounter() : coreTimeCounters(nCores) {
         PDH_STATUS status;
-        for (std::size_t i = 0; i < nCores; ++i) {
+        {
+            std::wstring fullCounterPath{L"\\Processor(_Total)\\% Processor Time"};
+            status = PdhAddCounterW(query, fullCounterPath.c_str(), 0, &coreTimeCounters[nCores - 1]);
+            if (ERROR_SUCCESS != status) {
+                throw std::system_error(status, std::system_category(), "PdhAddCounterW() failed");
+            }
+            status = PdhSetCounterScaleFactor(coreTimeCounters[nCores - 1], -2); // scale counter to [0, 1]
+            if (ERROR_SUCCESS != status) {
+                throw std::system_error(status, std::system_category(), "PdhSetCounterScaleFactor() failed");
+            }
+        }
+        for (std::size_t i = 0; i < nCores - 1; ++i) {
             std::wstring fullCounterPath{L"\\Processor(" + std::to_wstring(i) + L")\\% Processor Time"};
             status = PdhAddCounterW(query, fullCounterPath.c_str(), 0, &coreTimeCounters[i]);
             if (ERROR_SUCCESS != status) {
@@ -47,7 +62,6 @@ public:
         if (ERROR_SUCCESS != status) {
             throw std::system_error(status, std::system_category(), "PdhCollectQueryData() failed");
         }
-
         PDH_FMT_COUNTERVALUE displayValue;
         std::vector<double> cpuLoad(coreTimeCounters.size());
         for (std::size_t i = 0; i < coreTimeCounters.size(); ++i) {
@@ -174,7 +188,6 @@ void CpuMonitor::setHistorySize(std::size_t size) {
 
 void CpuMonitor::collectData() {
     std::vector<double> cpuLoad = performanceCounter->getCpuLoad();
-
     if (!cpuLoad.empty()) {
         for (std::size_t i = 0; i < cpuLoad.size(); ++i) {
             cpuLoadSum[i] += cpuLoad[i];

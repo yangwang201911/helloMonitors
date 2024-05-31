@@ -4,6 +4,7 @@
 
 #pragma once
 
+#define NOMINMAX
 #include <Pdh.h>
 class QueryWrapper {
 public:

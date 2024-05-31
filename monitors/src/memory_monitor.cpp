@@ -9,11 +9,12 @@ struct MemState {
 };
 
 #ifdef _WIN32
+#define NOMINMAX
 #include "query_wrapper.h"
 #include <algorithm>
 #define PSAPI_VERSION 2
 #include <system_error>
-#include <Windows.h>
+#include <windows.h>
 #include <PdhMsg.h>
 #include <Psapi.h>
 

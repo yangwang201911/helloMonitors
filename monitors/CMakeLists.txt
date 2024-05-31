@@ -15,14 +15,16 @@ set(HEADERS
 if(WIN32)
     list(APPEND SOURCES src/query_wrapper.cpp src/query_wrapper.h)
 endif()
-# Create named folders for the sources within the .vcproj
-# Empty name lists them directly under the .vcproj
-source_group("src" FILES ${SOURCES})
-source_group("include" FILES ${HEADERS})
 
-add_library(monitors STATIC ${SOURCES} ${HEADERS})
+if(OpenCV_FOUND)
+    # Add OpenCV header files top project
+    message(STATUS "OpenCV dir: ${OpenCV_INCLUDE_DIRS}")
+    include_directories(${OpenCV_INCLUDE_DIRS})
+endif()
+
+add_library(monitors STATIC ${SOURCES} ${HEADERS} ${OpenCV_INCLUDE_DIRS})
 target_include_directories(monitors PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(monitors PRIVATE opencv_core opencv_imgproc)
+target_link_libraries(monitors PRIVATE ${OpenCV_LIBS})
 if(WIN32)
     target_link_libraries(monitors PRIVATE pdh)
 endif()
