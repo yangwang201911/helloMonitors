@@ -250,6 +250,7 @@ int getPdhObjectsPath()
 
 int main()
 {
+    getPdhObjectsPath();
     int nGPUs = getGPUNumber();
     printf("number of GPUs: %d\n", nGPUs);
     getGPULoadPDH(nGPUs - 1);

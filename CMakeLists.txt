@@ -16,14 +16,9 @@ add_executable(main ${MAIN_SOURCES})
 file(GLOB MAIN_PDH_SOURCES "main_pdh.cpp")
 add_executable(main_pdh ${MAIN_PDH_SOURCES})
 
-file(GLOB MAIN_GPU_SOURCES "main_gpu.cpp")
-add_executable(main_gpu ${MAIN_GPU_SOURCES})
-
 file(GLOB MAIN_SYSTEM_TIMES_SOURCES "main_getsystemtimes.cpp")
 add_executable(main_time ${MAIN_SYSTEM_TIMES_SOURCES})
 
-file(GLOB TEST_SOURCES "performane_test.cpp")
-add_executable(test ${TEST_SOURCES})
 add_subdirectory(monitors)
 
 target_link_libraries(main_pdh PUBLIC monitors ${DXGI_LIBRARY})
