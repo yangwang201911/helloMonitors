@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "monitors/cpu_monitor.h"
-
 #include <algorithm>
 #include <iostream>
+#include "monitors/performance_counter.h"
+#include "monitors/cpu_performance_counter.h"
 #ifdef _WIN32
 #define NOMINMAX
 #include "query_wrapper.h"
@@ -16,38 +16,35 @@
 #include <PdhMsg.h>
 #include <windows.h>
 
-namespace {
-const std::size_t nCores = []() {
-        SYSTEM_INFO sysinfo;
-        GetSystemInfo(&sysinfo);
-        return sysinfo.dwNumberOfProcessors + 1;
-    }();
-}
+namespace ov {
+namespace monitor {
 
-class CpuMonitor::PerformanceCounter {
+class CpuPerformanceCounter::PerformanceCounterImpl {
 public:
-    PerformanceCounter() : coreTimeCounters(nCores) {
+    PerformanceCounterImpl(int nCores = 0) : coreTimeCounters(nCores) {
         PDH_STATUS status;
-        {
+        if (nCores == 0) {
+            coreTimeCounters.resize(1);
             std::wstring fullCounterPath{L"\\Processor(_Total)\\% Processor Time"};
-            status = PdhAddCounterW(query, fullCounterPath.c_str(), 0, &coreTimeCounters[nCores - 1]);
+            status = PdhAddCounterW(query, fullCounterPath.c_str(), 0, &coreTimeCounters[0]);
             if (ERROR_SUCCESS != status) {
                 throw std::system_error(status, std::system_category(), "PdhAddCounterW() failed");
             }
-            status = PdhSetCounterScaleFactor(coreTimeCounters[nCores - 1], -2); // scale counter to [0, 1]
+            status = PdhSetCounterScaleFactor(coreTimeCounters[0], -2); // scale counter to [0, 1]
             if (ERROR_SUCCESS != status) {
                 throw std::system_error(status, std::system_category(), "PdhSetCounterScaleFactor() failed");
             }
-        }
-        for (std::size_t i = 0; i < nCores - 1; ++i) {
-            std::wstring fullCounterPath{L"\\Processor(" + std::to_wstring(i) + L")\\% Processor Time"};
-            status = PdhAddCounterW(query, fullCounterPath.c_str(), 0, &coreTimeCounters[i]);
-            if (ERROR_SUCCESS != status) {
-                throw std::system_error(status, std::system_category(), "PdhAddCounterW() failed");
-            }
-            status = PdhSetCounterScaleFactor(coreTimeCounters[i], -2); // scale counter to [0, 1]
-            if (ERROR_SUCCESS != status) {
-                throw std::system_error(status, std::system_category(), "PdhSetCounterScaleFactor() failed");
+        } else {
+            for (std::size_t i = 0; i < nCores; ++i) {
+                std::wstring fullCounterPath{L"\\Processor(" + std::to_wstring(i) + L")\\% Processor Time"};
+                status = PdhAddCounterW(query, fullCounterPath.c_str(), 0, &coreTimeCounters[i]);
+                if (ERROR_SUCCESS != status) {
+                    throw std::system_error(status, std::system_category(), "PdhAddCounterW() failed");
+                }
+                status = PdhSetCounterScaleFactor(coreTimeCounters[i], -2); // scale counter to [0, 1]
+                if (ERROR_SUCCESS != status) {
+                    throw std::system_error(status, std::system_category(), "PdhSetCounterScaleFactor() failed");
+                }
             }
         }
         status = PdhCollectQueryData(query);
@@ -127,9 +124,9 @@ std::vector<unsigned long> getIdleCpuStat() {
 }
 }
 
-class CpuMonitor::PerformanceCounter {
+class CpuMonitor::PerformanceCounterImpl {
 public:
-    PerformanceCounter() : prevIdleCpuStat{getIdleCpuStat()}, prevTimePoint{std::chrono::steady_clock::now()} {}
+    PerformanceCounterImpl() : prevIdleCpuStat{getIdleCpuStat()}, prevTimePoint{std::chrono::steady_clock::now()} {}
 
     std::vector<double> getCpuLoad() {
         std::vector<unsigned long> idleCpuStat = getIdleCpuStat();
@@ -161,59 +158,19 @@ namespace {
 const std::size_t nCores{0};
 }
 
-class CpuMonitor::PerformanceCounter {
+class CpuMonitor::PerformanceCounterImpl {
 public:
     std::vector<double> getCpuLoad() {return {};};
 };
 #endif
-
-CpuMonitor::CpuMonitor() :
-    samplesNumber{0},
-    historySize{0},
-    cpuLoadSum(nCores, 0) {}
-
-// PerformanceCounter is incomplete in header and destructor can't be defined implicitly
-CpuMonitor::~CpuMonitor() = default;
-
-void CpuMonitor::setHistorySize(std::size_t size) {
-    if (0 == historySize && 0 != size) {
-        performanceCounter.reset(new PerformanceCounter);
-    } else if (0 != historySize && 0 == size) {
-        performanceCounter.reset();
-    }
-    historySize = size;
-    std::ptrdiff_t newSize = static_cast<std::ptrdiff_t>(std::min(size, cpuLoadHistory.size()));
-    cpuLoadHistory.erase(cpuLoadHistory.begin(), cpuLoadHistory.end() - newSize);
+CpuPerformanceCounter::CpuPerformanceCounter() : ov::monitor::PerformanceCounter("CPU") {}
+CpuPerformanceCounter::~CpuPerformanceCounter() {
+    delete performanceCounter; 
 }
-
-void CpuMonitor::collectData() {
-    std::vector<double> cpuLoad = performanceCounter->getCpuLoad();
-    if (!cpuLoad.empty()) {
-        for (std::size_t i = 0; i < cpuLoad.size(); ++i) {
-            cpuLoadSum[i] += cpuLoad[i];
-        }
-        ++samplesNumber;
-
-        cpuLoadHistory.push_back(std::move(cpuLoad));
-        if (cpuLoadHistory.size() > historySize) {
-            cpuLoadHistory.pop_front();
-        }
-    }
+std::vector<double> CpuPerformanceCounter::getLoad() {
+    if (!performanceCounter)
+        performanceCounter = new PerformanceCounterImpl();
+    return performanceCounter->getCpuLoad();
 }
-
-std::size_t CpuMonitor::getHistorySize() const {
-    return historySize;
 }
-
-std::deque<std::vector<double>> CpuMonitor::getLastHistory() const {
-    return cpuLoadHistory;
-}
-
-std::vector<double> CpuMonitor::getMeanCpuLoad() const {
-    std::vector<double> meanCpuLoad;
-    meanCpuLoad.reserve(cpuLoadSum.size());
-    for (double coreLoad : cpuLoadSum) {
-        meanCpuLoad.push_back(samplesNumber ? coreLoad / samplesNumber : 0);
-    }
-    return meanCpuLoad;
 }
