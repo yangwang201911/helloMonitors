@@ -13,10 +13,11 @@ namespace ov {
 namespace monitor {
 class CpuPerformanceCounter : public ov::monitor::PerformanceCounter {
 public:
-    CpuPerformanceCounter();
+    CpuPerformanceCounter(int nCores = 0);
     ~CpuPerformanceCounter();
     std::vector<double> getLoad() override;
 private:
+    int nCores = 0;
     class PerformanceCounterImpl;
     PerformanceCounterImpl* performanceCounter = NULL;
 };

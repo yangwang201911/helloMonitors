@@ -11,12 +11,14 @@ namespace ov {
 namespace monitor {
 DeviceMonitor::DeviceMonitor(const std::shared_ptr<ov::monitor::PerformanceCounter>& performanceCounter, unsigned historySize) :
     samplesNumber{0},
-    historySize{historySize},
+    historySize{historySize > 0 ? historySize : 1},
     performanceCounter{performanceCounter} {
         if (performanceCounter) {
             auto counterSize = performanceCounter->getCoreTimeCounters();
             deviceLoadSum.resize( counterSize > 0 ? counterSize : 1, 0);
         }
+        while (deviceLoadHistory.size() < historySize)
+            collectData();
     }
 
 DeviceMonitor::~DeviceMonitor() = default;
@@ -28,19 +30,21 @@ void DeviceMonitor::setHistorySize(std::size_t size) {
 }
 
 void DeviceMonitor::collectData() {
-    std::vector<double> deviceLoad = performanceCounter->getLoad();
-    if (!deviceLoad.empty()) {
-        for (std::size_t i = 0; i < deviceLoad.size(); ++i) {
-            if (historySize > 1)
-                deviceLoadSum[i] += deviceLoad[i];
-            else
-                deviceLoadSum[i] = deviceLoad[i];
-        }
-        ++samplesNumber;
-
-        deviceLoadHistory.push_back(std::move(deviceLoad));
-        if (deviceLoadHistory.size() > historySize) {
-            deviceLoadHistory.pop_front();
+    samplesNumber = 0;
+    deviceLoadHistory.clear();
+    while(deviceLoadHistory.size() < historySize) {
+        std::vector<double> deviceLoad = performanceCounter->getLoad();
+        if (!deviceLoad.empty()) {
+            for (std::size_t i = 0; i < deviceLoad.size(); ++i) {
+                if (deviceLoadHistory.size() == 0)
+                    deviceLoadSum[i] = 0.0;
+                if (historySize > 1)
+                    deviceLoadSum[i] += deviceLoad[i];
+                else
+                    deviceLoadSum[i] = deviceLoad[i];
+            }
+            ++samplesNumber;
+            deviceLoadHistory.push_back(std::move(deviceLoad));
         }
     }
 }
@@ -57,10 +61,7 @@ std::vector<double> DeviceMonitor::getMeanDeviceLoad() const {
     std::vector<double> meanDeviceLoad;
     meanDeviceLoad.reserve(deviceLoadSum.size());
     for (double coreLoad : deviceLoadSum) {
-        if (historySize > 1)
-            meanDeviceLoad.push_back(samplesNumber ? coreLoad / samplesNumber : 0);
-        else
-            meanDeviceLoad.push_back(samplesNumber ? coreLoad : 0);
+        meanDeviceLoad.push_back(samplesNumber ? coreLoad / samplesNumber : 0);
     }
     return meanDeviceLoad;
 }

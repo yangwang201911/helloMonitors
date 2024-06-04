@@ -35,6 +35,7 @@ public:
                 throw std::system_error(status, std::system_category(), "PdhSetCounterScaleFactor() failed");
             }
         } else {
+            coreTimeCounters.resize(nCores);
             for (std::size_t i = 0; i < nCores; ++i) {
                 std::wstring fullCounterPath{L"\\Processor(" + std::to_wstring(i) + L")\\% Processor Time"};
                 status = PdhAddCounterW(query, fullCounterPath.c_str(), 0, &coreTimeCounters[i]);
@@ -163,13 +164,13 @@ public:
     std::vector<double> getCpuLoad() {return {};};
 };
 #endif
-CpuPerformanceCounter::CpuPerformanceCounter() : ov::monitor::PerformanceCounter("CPU") {}
+CpuPerformanceCounter::CpuPerformanceCounter(int numCores) : nCores(numCores >= 0 ? numCores : 0), ov::monitor::PerformanceCounter("CPU", numCores) {}
 CpuPerformanceCounter::~CpuPerformanceCounter() {
     delete performanceCounter; 
 }
 std::vector<double> CpuPerformanceCounter::getLoad() {
     if (!performanceCounter)
-        performanceCounter = new PerformanceCounterImpl();
+        performanceCounter = new PerformanceCounterImpl(nCores);
     return performanceCounter->getCpuLoad();
 }
 }

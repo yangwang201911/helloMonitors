@@ -10,8 +10,7 @@ namespace ov {
 namespace monitor {
 class PerformanceCounter {
 public:
-    PerformanceCounter(std::string deviceName, int nCores = 0) : coreTimeCounters(nCores) {
-    }
+    PerformanceCounter(std::string deviceName, int nCores = 0) : coreTimeCounters(nCores >= 0 ? nCores : 0) {}
     virtual std::vector<double> getLoad() = 0;
     std::string name() {
         return deviceName;
