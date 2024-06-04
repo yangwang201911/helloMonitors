@@ -3,8 +3,6 @@ project(monitors_demo)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-find_package(OpenCV ${OpenCV_VERSION_REQUIRED} REQUIRED)
-
 find_library(DXGI_LIBRARY dxgi)
 if(NOT DXGI_LIBRARY)
     message(FATAL_ERROR "dxgi.lib not found")
@@ -21,7 +19,7 @@ add_executable(main_time ${MAIN_SYSTEM_TIMES_SOURCES})
 
 add_subdirectory(monitors)
 
-target_link_libraries(main_pdh PUBLIC monitors ${DXGI_LIBRARY})
+target_link_libraries(main_pdh PUBLIC pdh dxgi)
 target_link_libraries(main_time PUBLIC monitors)
 target_link_libraries(main PUBLIC monitors)
 

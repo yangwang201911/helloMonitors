@@ -11,9 +11,7 @@ int getGPUNumber()
     IDXGIFactory *pFactory;
     HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void **)(&pFactory));
     if (FAILED(hr))
-    {
-        // Handle error
-    }
+        return -1;
     int gpuIndex = 0;
     int realGpuNmb = 0;
     IDXGIAdapter *pAdapter;
@@ -21,6 +19,7 @@ int getGPUNumber()
     {
         DXGI_ADAPTER_DESC desc;
         pAdapter->GetDesc(&desc);
+        wprintf(L" ***: %s\n", desc.Description);
         if (wcscmp(desc.Description, L"Microsoft Basic Render Driver") != 0)
         {
             wprintf(L"Device Number: %d\n", gpuIndex);
@@ -34,7 +33,6 @@ int getGPUNumber()
 
 int getCPULoadPDH()
 {
-    // 初始化 PDH 查询
     PDH_STATUS status;
     PDH_HQUERY query;
     status = PdhOpenQuery(NULL, 0, &query);
@@ -43,7 +41,6 @@ int getCPULoadPDH()
         std::cerr << "PdhOpenQuery failed with error code: " << status << std::endl;
         return 1;
     }
-    // 添加 CPU 利用率性能计数器
     PDH_HCOUNTER counter;
     std::string fullCounterPath{"\\Processor(_Total)\\% Processor Time"};
     status = PdhAddCounter(query, fullCounterPath.c_str(), 0, &counter);
@@ -56,7 +53,6 @@ int getCPULoadPDH()
 
     while (1)
     {
-        // 收集查询数据
         status = PdhCollectQueryData(query);
         if (status != ERROR_SUCCESS)
         {
@@ -64,8 +60,7 @@ int getCPULoadPDH()
             PdhCloseQuery(query);
             return 1;
         }
-        // 等待一段时间，再次收集数据
-        Sleep(1000); // 等待 1 秒
+        Sleep(1000);
         status = PdhCollectQueryData(query);
         if (status != ERROR_SUCCESS)
         {
@@ -74,7 +69,6 @@ int getCPULoadPDH()
             return 1;
         }
 
-        // 获取性能计数器值
         PDH_FMT_COUNTERVALUE value;
         status = PdhGetFormattedCounterValue(counter, PDH_FMT_DOUBLE, NULL, &value);
         if (status != ERROR_SUCCESS)
@@ -84,10 +78,8 @@ int getCPULoadPDH()
             return 1;
         }
 
-        // 输出 CPU 利用率
         std::cout << "CPU usage: " << value.doubleValue << "%" << std::endl;
     }
-    // 关闭查询
     PdhCloseQuery(query);
 
     return 0;
@@ -95,7 +87,6 @@ int getCPULoadPDH()
 
 int getGPULoadPDH(int index = 0)
 {
-    // 初始化 PDH 查询
     PDH_STATUS status;
     PDH_HQUERY query;
     status = PdhOpenQuery(NULL, 0, &query);
@@ -104,7 +95,6 @@ int getGPULoadPDH(int index = 0)
         std::cerr << "PdhOpenQuery failed with error code: " << status << std::endl;
         return 1;
     }
-    // 添加 GPU 利用率性能计数器
     PDH_HCOUNTER counter;
     std::string fullCounterPath{"\\GPU Engine(*phys_" + std::to_string(index) + "_*3d)\\Utilization Percentage"};
     status = PdhAddCounter(query, fullCounterPath.c_str(), 0, &counter);
@@ -117,7 +107,6 @@ int getGPULoadPDH(int index = 0)
 
     while (1)
     {
-        // 收集查询数据
         status = PdhCollectQueryData(query);
         if (status != ERROR_SUCCESS)
         {
@@ -125,8 +114,7 @@ int getGPULoadPDH(int index = 0)
             PdhCloseQuery(query);
             return 1;
         }
-        // 等待一段时间，再次收集数据
-        Sleep(1000); // 等待 1 秒
+        Sleep(1000);
         status = PdhCollectQueryData(query);
         if (status != ERROR_SUCCESS)
         {
@@ -135,7 +123,6 @@ int getGPULoadPDH(int index = 0)
             return 1;
         }
 
-        // 获取性能计数器值
         PDH_FMT_COUNTERVALUE value;
         status = PdhGetFormattedCounterValue(counter, PDH_FMT_DOUBLE, NULL, &value);
         if (status != ERROR_SUCCESS)
@@ -145,10 +132,8 @@ int getGPULoadPDH(int index = 0)
             return 1;
         }
 
-        // 输出 GPU 利用率
         std::cout << "GPU usage: " << value.doubleValue << "%" << std::endl;
     }
-    // 关闭查询
     PdhCloseQuery(query);
 
     return 0;
@@ -161,7 +146,6 @@ void PrintCounterPaths(LPCWSTR szObjectName)
     DWORD dwBufferCount = 0;
     LPWSTR szCounterListBuffer = NULL;
     LPWSTR szInstanceListBuffer = NULL;
-    // 获取对象的计数器和实例名
     Status = PdhEnumObjectItemsW(
         NULL,                 // real time source
         NULL,                 // local machine
@@ -174,7 +158,6 @@ void PrintCounterPaths(LPCWSTR szObjectName)
         0);                   // default format
     if (Status == PDH_MORE_DATA)
     {
-        // 分配缓冲区
         szCounterListBuffer = (LPWSTR)malloc(dwBufferSize * sizeof(WCHAR));
         szInstanceListBuffer = (LPWSTR)malloc(dwBufferCount * sizeof(WCHAR));
         if (szCounterListBuffer != NULL && szInstanceListBuffer != NULL)
@@ -188,7 +171,6 @@ void PrintCounterPaths(LPCWSTR szObjectName)
     }
     if (Status == ERROR_SUCCESS)
     {
-        // 打印所有的计数器路径
         for (LPWSTR szThisCounter = szCounterListBuffer;
              *szThisCounter != '\0';
              szThisCounter += wcslen(szThisCounter) + 1)
@@ -196,7 +178,6 @@ void PrintCounterPaths(LPCWSTR szObjectName)
             printf("%ws\\%ws\n", szObjectName, szThisCounter);
         }
     }
-    // 释放缓冲区
     if (szCounterListBuffer != NULL)
     {
         free(szCounterListBuffer);
@@ -211,7 +192,6 @@ int getPdhObjectsPath()
     PDH_STATUS Status;
     DWORD dwBufferSize = 0;
     LPWSTR szObjectListBuffer = NULL;
-    // 枚举本地计算机上的所有性能对象
     Status = PdhEnumObjectsW(
         NULL,               // real time source
         NULL,               // local machine
@@ -221,7 +201,6 @@ int getPdhObjectsPath()
         FALSE);             // refresh flag
     if (Status == PDH_MORE_DATA)
     {
-        // 分配缓冲区
         szObjectListBuffer = (LPWSTR)malloc(dwBufferSize * sizeof(WCHAR));
         if (szObjectListBuffer != NULL)
         {
@@ -232,7 +211,6 @@ int getPdhObjectsPath()
     }
     if (Status == ERROR_SUCCESS)
     {
-        // 对于每个对象，打印所有的计数器路径
         for (LPWSTR szThisObject = szObjectListBuffer;
              *szThisObject != '\0';
              szThisObject += wcslen(szThisObject) + 1)
@@ -240,7 +218,6 @@ int getPdhObjectsPath()
             PrintCounterPaths(szThisObject);
         }
     }
-    // 释放缓冲区
     if (szObjectListBuffer != NULL)
     {
         free(szObjectListBuffer);
