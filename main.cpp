@@ -8,6 +8,8 @@ int main(int argc, char *argv[])
 {
     ov::monitor::DeviceMonitor cpuMonitor{std::make_shared<ov::monitor::CpuPerformanceCounter>(), 1};
     ov::monitor::DeviceMonitor gpuMonitor{std::make_shared<ov::monitor::GpuPerformanceCounter>(), 1};
+    cpuMonitor.collectData();
+    gpuMonitor.collectData();
     while (1)
     {
         std::cout << "CPU: ";
