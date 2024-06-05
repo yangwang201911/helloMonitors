@@ -42,9 +42,6 @@ public:
             coreTimeCounters[i][COMPUTE_ENGINE_COUNTER_INDEX] = addCounter(query, expandWildCardPath(fullComputeCounterPath.c_str()));
         }
         auto status = PdhCollectQueryData(query);
-        if (ERROR_SUCCESS != status) {
-            std::cout << "PdhCollectQueryData() failed. Return code: " << status << std::endl;
-        }
     }
 
     std::vector<std::string> expandWildCardPath(LPCSTR WildCardPath) {
@@ -54,14 +51,12 @@ public:
         std::vector<std::string> pathList;
         Status = PdhExpandWildCardPathA(NULL, WildCardPath, NULL, &PathListLength, 0);
         if (Status != ERROR_SUCCESS && Status != PDH_MORE_DATA) {
-            std::cout << "PdhExpandWildCardPathA failed with return code: " << Status << std::endl;
             return pathList;
         }
         PathListLengthBufLen = PathListLength + 100;
         PZZSTR ExpandedPathList = (PZZSTR)malloc(PathListLengthBufLen);
         Status = PdhExpandWildCardPathA(NULL, WildCardPath, ExpandedPathList, &PathListLength, 0);
         if (Status != ERROR_SUCCESS) {
-            std::cout << "PdhExpandWildCardPathA failed with return code: " << Status << std::endl;
             free(ExpandedPathList);
             return pathList;
         }
@@ -86,7 +81,6 @@ public:
             PDH_HCOUNTER Counter;
             Status = PdhAddCounterA(Query, path.c_str(), NULL, &Counter);
             if (Status != ERROR_SUCCESS) {
-                std::cout << "PdhAddCounter() failed." << path << " Return code: " << Status << std::endl;
                 return CounterList;
             }
             Status = PdhSetCounterScaleFactor(Counter, -2); // scale counter to [0, 1]
@@ -109,9 +103,6 @@ public:
         }
         lastTimeStamp = std::chrono::system_clock::now();
         status = PdhCollectQueryData(query);
-        if (ERROR_SUCCESS != status) {
-            std::cout << "PdhCollectQueryData() failed. Return code: " << status << std::endl;
-        }
         PDH_FMT_COUNTERVALUE displayValue;
         std::vector<double> gpuLoad(coreTimeCounters.size());
         for (std::size_t coreIndex = 0; coreIndex < coreTimeCounters.size(); ++coreIndex) {
@@ -123,7 +114,6 @@ public:
                     status = PdhGetFormattedCounterValue(counter, PDH_FMT_DOUBLE, NULL,
                         &displayValue);
                     if (status != ERROR_SUCCESS) {
-                        std::cout << "PdhGetFormattedCounterValue failed. Return code: " << status << std::endl;
                         continue;
                     }
                     value += displayValue.doubleValue; 
