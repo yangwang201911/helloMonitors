@@ -25,7 +25,6 @@ int main(int argc, char *argv[])
         }
         std::cout << std::endl;
         gpuMonitor.collectData();
-        //std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     return 0;
 }

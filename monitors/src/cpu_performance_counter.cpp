@@ -56,6 +56,14 @@ public:
 
     std::vector<double> getCpuLoad() {
         PDH_STATUS status;
+        auto ts = std::chrono::system_clock::now();
+        if (ts > lastTimeStamp) {
+            auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - lastTimeStamp);
+            if (delta.count() < 500) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500 - delta.count()));
+            }
+        }
+        lastTimeStamp = std::chrono::system_clock::now();
         status = PdhCollectQueryData(query);
         if (ERROR_SUCCESS != status) {
             throw std::system_error(status, std::system_category(), "PdhCollectQueryData() failed");
@@ -84,6 +92,7 @@ public:
 private:
     QueryWrapper query;
     std::vector<PDH_HCOUNTER> coreTimeCounters;
+    std::chrono::time_point<std::chrono::system_clock> lastTimeStamp = std::chrono::system_clock::now();
 };
 
 #elif __linux__
