@@ -13,8 +13,13 @@
 #include <thread>
 #include <chrono>
 #include <system_error>
-#include <PdhMsg.h>
+#define _PDH_
 #include <windows.h>
+#include <pdh.h>
+#include <pdhmsg.h>
+#define RENDER_ENGINE_COUNTER_INDEX 0
+#define COMPUTE_ENGINE_COUNTER_INDEX 1
+#define MAX_COUNTER_INDEX 2
 
 namespace ov {
 namespace monitor {
@@ -22,55 +27,117 @@ namespace monitor {
 class GpuPerformanceCounter::PerformanceCounterImpl {
 public:
     PerformanceCounterImpl(int nCores = 0) {
-        PDH_STATUS status;
-        coreTimeCounters.resize(nCores > 0 ? nCores : 1, 0);
+        coreTimeCounters.resize(nCores > 0 ? nCores : 1);
         for (std::size_t i = 0; i < nCores; ++i) {
-            std::wstring fullCounterPath{L"\\GPU Engine(*phys_" + std::to_wstring(i) + L"_*3d)\\Utilization Percentage"};
-            status = PdhAddCounterW(query, fullCounterPath.c_str(), 0, &coreTimeCounters[i]);
-            if (ERROR_SUCCESS != status) {
-                throw std::system_error(status, std::system_category(), "PdhAddCounterW() failed");
-            }
-            status = PdhSetCounterScaleFactor(coreTimeCounters[i], -2); // scale counter to [0, 1]
-            if (ERROR_SUCCESS != status) {
-                throw std::system_error(status, std::system_category(), "PdhSetCounterScaleFactor() failed");
-            }
+            coreTimeCounters[i].resize(MAX_COUNTER_INDEX);
         }
-        status = PdhCollectQueryData(query);
+        initCoreCounters();
+    }
+
+    void initCoreCounters() {
+        for (std::size_t i = 0; i < coreTimeCounters.size(); ++i) {
+            std::string full3DCounterPath = std::string("\\GPU Engine(*_") + std::to_string(i) + std::string("_*engtype_3D)\\Utilization Percentage");
+            std::string fullComputeCounterPath = std::string("\\GPU Engine(*_") + std::to_string(i) + std::string("_*engtype_Compute)\\Utilization Percentage");
+            coreTimeCounters[i][RENDER_ENGINE_COUNTER_INDEX] = addCounter(query, expandWildCardPath(full3DCounterPath.c_str()));
+            coreTimeCounters[i][COMPUTE_ENGINE_COUNTER_INDEX] = addCounter(query, expandWildCardPath(fullComputeCounterPath.c_str()));
+        }
+        auto status = PdhCollectQueryData(query);
         if (ERROR_SUCCESS != status) {
-            throw std::system_error(status, std::system_category(), "PdhCollectQueryData() failed");
+            std::cout << "PdhCollectQueryData() failed. Return code: " << status << std::endl;
         }
+    }
+
+    std::vector<std::string> expandWildCardPath(LPCSTR WildCardPath) {
+        PDH_STATUS Status = ERROR_SUCCESS;
+        DWORD PathListLength = 0;
+        DWORD PathListLengthBufLen;
+        std::vector<std::string> pathList;
+        Status = PdhExpandWildCardPathA(NULL, WildCardPath, NULL, &PathListLength, 0);
+        if (Status != ERROR_SUCCESS && Status != PDH_MORE_DATA) {
+            std::cout << "PdhExpandWildCardPathA failed with return code: " << Status << std::endl;
+            return pathList;
+        }
+        PathListLengthBufLen = PathListLength + 100;
+        PZZSTR ExpandedPathList = (PZZSTR)malloc(PathListLengthBufLen);
+        Status = PdhExpandWildCardPathA(NULL, WildCardPath, ExpandedPathList, &PathListLength, 0);
+        if (Status != ERROR_SUCCESS) {
+            std::cout << "PdhExpandWildCardPathA failed with return code: " << Status << std::endl;
+            free(ExpandedPathList);
+            return pathList;
+        }
+        for (int i = 0; i < PathListLength;) {
+            std::string path(ExpandedPathList + i);
+            if (path.length() > 0) {
+                //std::cout << path << std::endl;
+                pathList.push_back(path);
+                i += path.length() + 1;
+            } else {
+                break;
+            }
+        }
+        free(ExpandedPathList);
+        return pathList;
+    }
+
+    std::vector<PDH_HCOUNTER> addCounter(PDH_HQUERY Query, std::vector<std::string> pathList) {
+        PDH_STATUS Status;
+        std::vector<PDH_HCOUNTER> CounterList;
+        for (std::string path : pathList) {
+            PDH_HCOUNTER Counter;
+            Status = PdhAddCounterA(Query, path.c_str(), NULL, &Counter);
+            if (Status != ERROR_SUCCESS) {
+                std::cout << "PdhAddCounter() failed." << path << " Return code: " << Status << std::endl;
+                return CounterList;
+            }
+            Status = PdhSetCounterScaleFactor(Counter, -2); // scale counter to [0, 1]
+            if (ERROR_SUCCESS != Status) {
+                return CounterList;
+            }
+            CounterList.push_back(Counter);
+        }
+        return CounterList;
     }
 
     std::vector<double> getGpuLoad() {
         PDH_STATUS status;
+        auto ts = std::chrono::system_clock::now();
+        if (ts > lastTimeStamp) {
+            auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - lastTimeStamp);
+            if (delta.count() < 500) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500 - delta.count()));
+            }
+        }
+        lastTimeStamp = std::chrono::system_clock::now();
         status = PdhCollectQueryData(query);
         if (ERROR_SUCCESS != status) {
-            throw std::system_error(status, std::system_category(), "PdhCollectQueryData() failed");
+            std::cout << "PdhCollectQueryData() failed. Return code: " << status << std::endl;
         }
         PDH_FMT_COUNTERVALUE displayValue;
         std::vector<double> gpuLoad(coreTimeCounters.size());
-        for (std::size_t i = 0; i < coreTimeCounters.size(); ++i) {
-            status = PdhGetFormattedCounterValue(coreTimeCounters[i], PDH_FMT_DOUBLE, NULL,
-                &displayValue);
-            switch (status) {
-                case ERROR_SUCCESS: break;
-                // PdhGetFormattedCounterValue() can sometimes return PDH_CALC_NEGATIVE_DENOMINATOR for some reason
-                case PDH_CALC_NEGATIVE_DENOMINATOR: return {};
-                default:
-                    throw std::system_error(status, std::system_category(), "PdhGetFormattedCounterValue() failed");
+        for (std::size_t coreIndex = 0; coreIndex < coreTimeCounters.size(); ++coreIndex) {
+            double value = 0;
+            auto coreCounters = coreTimeCounters[coreIndex];
+            for (int counterIndex = 0; counterIndex < MAX_COUNTER_INDEX; counterIndex++) {
+                auto countersList = coreCounters[counterIndex];
+                for (auto counter : countersList) {
+                    status = PdhGetFormattedCounterValue(counter, PDH_FMT_DOUBLE, NULL,
+                        &displayValue);
+                    if (status != ERROR_SUCCESS) {
+                        std::cout << "PdhGetFormattedCounterValue failed. Return code: " << status << std::endl;
+                        continue;
+                    }
+                    value += displayValue.doubleValue; 
+                }
             }
-            if (PDH_CSTATUS_VALID_DATA != displayValue.CStatus && PDH_CSTATUS_NEW_DATA != displayValue.CStatus) {
-                throw std::runtime_error("Error in counter data");
-            }
-
-            gpuLoad[i] = displayValue.doubleValue;
+            gpuLoad[coreIndex] = value;
         }
         return gpuLoad;
     }
 
 private:
     QueryWrapper query;
-    std::vector<PDH_HCOUNTER> coreTimeCounters;
+    std::vector<std::vector<std::vector<PDH_HCOUNTER>>> coreTimeCounters;
+    std::chrono::time_point<std::chrono::system_clock> lastTimeStamp = std::chrono::system_clock::now();
 };
 
 #elif __linux__
