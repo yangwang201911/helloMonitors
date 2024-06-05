@@ -6,7 +6,7 @@
 #include "monitors/gpu_performance_counter.h"
 int main(int argc, char *argv[])
 {
-    ov::monitor::DeviceMonitor cpuMonitor{std::make_shared<ov::monitor::CpuPerformanceCounter>(5), 1};
+    ov::monitor::DeviceMonitor cpuMonitor{std::make_shared<ov::monitor::CpuPerformanceCounter>(), 1};
     ov::monitor::DeviceMonitor gpuMonitor{std::make_shared<ov::monitor::GpuPerformanceCounter>(), 1};
     while (1)
     {
@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
         }
         std::cout << std::endl;
         gpuMonitor.collectData();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        //std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     return 0;
 }
