@@ -13,10 +13,6 @@ DeviceMonitor::DeviceMonitor(const std::shared_ptr<ov::monitor::PerformanceCount
     samplesNumber{0},
     historySize{historySize > 0 ? historySize : 1},
     performanceCounter{performanceCounter} {
-        if (performanceCounter) {
-            auto counterSize = performanceCounter->getCoreTimeCounters();
-            deviceLoadSum.resize( counterSize > 0 ? counterSize : 1, 0);
-        }
         while (deviceLoadHistory.size() < historySize)
             collectData();
     }
@@ -34,6 +30,8 @@ void DeviceMonitor::collectData() {
     deviceLoadHistory.clear();
     while(deviceLoadHistory.size() < historySize) {
         std::vector<double> deviceLoad = performanceCounter->getLoad();
+        if (deviceLoadSum.empty())
+            deviceLoadSum.resize(deviceLoad.size(), 0.0);
         if (!deviceLoad.empty()) {
             for (std::size_t i = 0; i < deviceLoad.size(); ++i) {
                 if (deviceLoadHistory.size() == 0)

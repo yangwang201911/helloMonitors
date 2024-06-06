@@ -25,10 +25,9 @@
 
 namespace ov {
 namespace monitor {
-
 class GpuPerformanceCounter::PerformanceCounterImpl {
 public:
-    PerformanceCounterImpl(int nCores = 0) {
+    PerformanceCounterImpl() {
         auto devices = getNumberOfCores();
         coreTimeCounters.resize(devices.size());
         for (std::size_t i = 0; i < devices.size(); ++i) {
@@ -135,7 +134,8 @@ public:
         lastTimeStamp = std::chrono::system_clock::now();
         status = PdhCollectQueryData(query);
         PDH_FMT_COUNTERVALUE displayValue;
-        std::vector<double> gpuLoad(coreTimeCounters.size());
+        std::vector<double> gpuLoad;
+        gpuLoad.resize(coreTimeCounters.size(), 0.0);
         for (std::size_t coreIndex = 0; coreIndex < coreTimeCounters.size(); ++coreIndex) {
             double value = 0;
             auto coreCounters = coreTimeCounters[coreIndex];
@@ -239,14 +239,13 @@ public:
     std::vector<double> getCpuLoad() {return {};};
 };
 #endif
-GpuPerformanceCounter::GpuPerformanceCounter(int numCores) : nCores(numCores > 0 ? numCores : 1), ov::monitor::PerformanceCounter("GPU", numCores > 0 ? numCores : 1) {
-}
+GpuPerformanceCounter::GpuPerformanceCounter() : ov::monitor::PerformanceCounter("GPU") {}
 GpuPerformanceCounter::~GpuPerformanceCounter() {
     delete performanceCounter; 
 }
 std::vector<double> GpuPerformanceCounter::getLoad() {
     if (!performanceCounter)
-        performanceCounter = new PerformanceCounterImpl(nCores);
+        performanceCounter = new PerformanceCounterImpl();
     return performanceCounter->getGpuLoad();
 }
 }

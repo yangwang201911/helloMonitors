@@ -21,8 +21,9 @@ namespace monitor {
 
 class CpuPerformanceCounter::PerformanceCounterImpl {
 public:
-    PerformanceCounterImpl(int nCores = 0) : coreTimeCounters(nCores) {
+    PerformanceCounterImpl() {
         PDH_STATUS status;
+        int nCores = getNumberOfCores();
         if (nCores == 0) {
             coreTimeCounters.resize(1);
             std::wstring fullCounterPath{L"\\Processor(_Total)\\% Processor Time"};
@@ -87,6 +88,11 @@ public:
             cpuLoad[i] = displayValue.doubleValue;
         }
         return cpuLoad;
+    }
+
+
+    int getNumberOfCores() {
+        return 0; 
     }
 
 private:
@@ -173,13 +179,13 @@ public:
     std::vector<double> getCpuLoad() {return {};};
 };
 #endif
-CpuPerformanceCounter::CpuPerformanceCounter(int numCores) : nCores(numCores >= 0 ? numCores : 0), ov::monitor::PerformanceCounter("CPU", numCores) {}
+CpuPerformanceCounter::CpuPerformanceCounter(int numCores) : nCores(numCores >= 0 ? numCores : 0), ov::monitor::PerformanceCounter("CPU") {}
 CpuPerformanceCounter::~CpuPerformanceCounter() {
     delete performanceCounter; 
 }
 std::vector<double> CpuPerformanceCounter::getLoad() {
     if (!performanceCounter)
-        performanceCounter = new PerformanceCounterImpl(nCores);
+        performanceCounter = new PerformanceCounterImpl();
     return performanceCounter->getCpuLoad();
 }
 }
