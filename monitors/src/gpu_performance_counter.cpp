@@ -30,6 +30,7 @@ class GpuPerformanceCounter::PerformanceCounterImpl {
 public:
     PerformanceCounterImpl(int nCores = 0) {
         auto devices = getNumberOfCores();
+        std::cout << "Device: " << "GPU"<< "\tNumber of cores: " << devices.size() << std::endl;
         coreTimeCounters.resize(devices.size());
         for (std::size_t i = 0; i < devices.size(); ++i) {
             coreTimeCounters[i].resize(MAX_COUNTER_INDEX);
@@ -50,7 +51,7 @@ public:
         {
             DXGI_ADAPTER_DESC desc;
             pAdapter->GetDesc(&desc);
-            if (wcscmp(desc.Description, L"Microsoft Basic Render Driver") != 0 || desc.VendorId == 0x8086) {
+            if (wcscmp(desc.Description, L"Microsoft Basic Render Driver") != 0 && desc.VendorId == 0x8086) {
                 gpuCores.push_back(desc.AdapterLuid);
             }
             gpuIndex++;
