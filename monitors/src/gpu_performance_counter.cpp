@@ -30,12 +30,12 @@ class GpuPerformanceCounter::PerformanceCounterImpl {
 public:
     PerformanceCounterImpl(int nCores = 0) {
         auto devices = getNumberOfCores();
-        std::cout << "Device: " << "GPU"<< "\tNumber of cores: " << devices.size() << std::endl;
         coreTimeCounters.resize(devices.size());
         for (std::size_t i = 0; i < devices.size(); ++i) {
             coreTimeCounters[i].resize(MAX_COUNTER_INDEX);
         }
         initCoreCounters(devices);
+        std::cout << "Device: " << "GPU"<< "\tNumber of cores: " << devices.size() << std::endl;
     }
 
     std::vector<LUID> getNumberOfCores()
@@ -66,7 +66,7 @@ public:
             return ss.str();
         };
         for (int i = 0; i < devices.size(); i++) {
-            std::cout << "device luid: " << LuidToString(devices.at(i)) << std::endl;
+            std::cout << "device index: " << i << "\tluid: " << LuidToString(devices.at(i)) << std::endl;
             std::string full3DCounterPath = std::string("\\GPU Engine(*_luid_*" + LuidToString(devices.at(i)) + "_phys*engtype_3D)\\Utilization Percentage");
             std::string fullComputeCounterPath = std::string("\\GPU Engine(*_luid_*" + LuidToString(devices.at(i)) + "_phys*engtype_Compute)\\Utilization Percentage");
             coreTimeCounters[i][RENDER_ENGINE_COUNTER_INDEX] = addCounter(query, expandWildCardPath(full3DCounterPath.c_str()));
