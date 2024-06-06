@@ -19,9 +19,10 @@ int getGPUNumber()
     {
         DXGI_ADAPTER_DESC desc;
         pAdapter->GetDesc(&desc);
-        wprintf(L"  Device Name: %s\tVendor ID: 0x%x\n", desc.Description, desc.VendorId);
-        if (wcscmp(desc.Description, L"Microsoft Basic Render Driver") != 0 || desc.VendorId == 0x8086)
+        if (wcscmp(desc.Description, L"Microsoft Basic Render Driver") != 0 || desc.VendorId == 0x8086) {
+            wprintf(L"  Device Name: %s\tVendor ID: 0x%x\tDevice ID: 0x%x\n", desc.Description, desc.VendorId, desc.AdapterLuid);
             realGpuNmb++;
+        }
         gpuIndex++;
     }
     return realGpuNmb;
