@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 #include "monitors/performance_counter.h"
 #include "monitors/gpu_performance_counter.h"
 #ifdef _WIN32
@@ -17,6 +18,7 @@
 #include <windows.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <dxgi.h>
 #define RENDER_ENGINE_COUNTER_INDEX 0
 #define COMPUTE_ENGINE_COUNTER_INDEX 1
 #define MAX_COUNTER_INDEX 2
@@ -27,17 +29,45 @@ namespace monitor {
 class GpuPerformanceCounter::PerformanceCounterImpl {
 public:
     PerformanceCounterImpl(int nCores = 0) {
-        coreTimeCounters.resize(nCores > 0 ? nCores : 1);
-        for (std::size_t i = 0; i < nCores; ++i) {
+        auto devices = getNumberOfCores();
+        coreTimeCounters.resize(devices.size());
+        for (std::size_t i = 0; i < devices.size(); ++i) {
             coreTimeCounters[i].resize(MAX_COUNTER_INDEX);
         }
-        initCoreCounters();
+        initCoreCounters(devices);
     }
 
-    void initCoreCounters() {
-        for (std::size_t i = 0; i < coreTimeCounters.size(); ++i) {
-            std::string full3DCounterPath = std::string("\\GPU Engine(*_") + std::to_string(i) + std::string("_*engtype_3D)\\Utilization Percentage");
-            std::string fullComputeCounterPath = std::string("\\GPU Engine(*_") + std::to_string(i) + std::string("_*engtype_Compute)\\Utilization Percentage");
+    std::vector<LUID> getNumberOfCores()
+    {
+        IDXGIFactory *pFactory;
+        HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void **)(&pFactory));
+        if (FAILED(hr))
+            return {};
+        int gpuIndex = 0;
+        std::vector<LUID> gpuCores;
+        IDXGIAdapter *pAdapter;
+        while (pFactory->EnumAdapters(gpuIndex, &pAdapter) != DXGI_ERROR_NOT_FOUND)
+        {
+            DXGI_ADAPTER_DESC desc;
+            pAdapter->GetDesc(&desc);
+            if (wcscmp(desc.Description, L"Microsoft Basic Render Driver") != 0 || desc.VendorId == 0x8086) {
+                gpuCores.push_back(desc.AdapterLuid);
+            }
+            gpuIndex++;
+        }
+        return gpuCores;
+    }
+
+    void initCoreCounters(const std::vector<LUID>& devices) {
+        auto LuidToString = [](LUID luid) -> std::string {
+            std::stringstream ss;
+            ss << std::hex << ((long long)luid.HighPart << 32 | luid.LowPart);
+            return ss.str();
+        };
+        for (int i = 0; i < devices.size(); i++) {
+            std::cout << "device luid: " << LuidToString(devices.at(i)) << std::endl;
+            std::string full3DCounterPath = std::string("\\GPU Engine(*_luid_*" + LuidToString(devices.at(i)) + "_phys*engtype_3D)\\Utilization Percentage");
+            std::string fullComputeCounterPath = std::string("\\GPU Engine(*_luid_*" + LuidToString(devices.at(i)) + "_phys*engtype_Compute)\\Utilization Percentage");
             coreTimeCounters[i][RENDER_ENGINE_COUNTER_INDEX] = addCounter(query, expandWildCardPath(full3DCounterPath.c_str()));
             coreTimeCounters[i][COMPUTE_ENGINE_COUNTER_INDEX] = addCounter(query, expandWildCardPath(fullComputeCounterPath.c_str()));
         }
