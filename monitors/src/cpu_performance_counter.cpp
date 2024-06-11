@@ -140,7 +140,9 @@ std::vector<unsigned long> getIdleCpuStat() {
 }
 }
 
-class CpuMonitor::PerformanceCounterImpl {
+namespace ov {
+namespace monitor {
+class CpuPerformanceCounter::PerformanceCounterImpl {
 public:
     PerformanceCounterImpl() : prevIdleCpuStat{getIdleCpuStat()}, prevTimePoint{std::chrono::steady_clock::now()} {}
 
@@ -149,8 +151,8 @@ public:
         auto timePoint = std::chrono::steady_clock::now();
         // don't update data too frequently which may result in negative values for cpuLoad.
         // It may happen when collectData() is called just after setHistorySize().
-        if (timePoint - prevTimePoint > std::chrono::milliseconds{100}) {
-            std::vector<double> cpuLoad(nCores);
+        if (timePoint - prevTimePoint > std::chrono::milliseconds{300}) {
+            std::vector<double> cpuLoad(::nCores);
             for (std::size_t i = 0; i < idleCpuStat.size(); ++i) {
                 double idleDiff = idleCpuStat[i] - prevIdleCpuStat[i];
                 typedef std::chrono::duration<double, std::chrono::seconds::period> Sec;

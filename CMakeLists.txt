@@ -11,17 +11,13 @@ if(WIN32)
     file(GLOB MAIN_PDH_SOURCES "main_pdh.cpp")
     add_executable(main_pdh ${MAIN_PDH_SOURCES})
     target_link_libraries(main_pdh PUBLIC pdh dxgi)
+    file(GLOB MAIN_SYSTEM_TIMES_SOURCES "main_getsystemtimes.cpp")
+    add_executable(main_time ${MAIN_SYSTEM_TIMES_SOURCES})
+    target_link_libraries(main_time PUBLIC monitors)
 endif()
 
 file(GLOB MAIN_SOURCES "main.cpp")
 add_executable(main ${MAIN_SOURCES})
-
-
-file(GLOB MAIN_SYSTEM_TIMES_SOURCES "main_getsystemtimes.cpp")
-add_executable(main_time ${MAIN_SYSTEM_TIMES_SOURCES})
-
 add_subdirectory(monitors)
-
-target_link_libraries(main_time PUBLIC monitors)
 target_link_libraries(main PUBLIC monitors)
 
