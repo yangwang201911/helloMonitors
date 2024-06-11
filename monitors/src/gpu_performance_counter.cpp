@@ -52,6 +52,8 @@ public:
             pAdapter->GetDesc(&desc);
             if (wcscmp(desc.Description, L"Microsoft Basic Render Driver") != 0 && desc.VendorId == 0x8086) {
                 gpuCores.push_back(desc.AdapterLuid);
+                wprintf(L"GPU Name: %s\tLUID: ", desc.Description);
+                std::cout << std::hex << desc.AdapterLuid.HighPart << "-" << desc.AdapterLuid.LowPart << std::endl;
             }
             gpuIndex++;
         }
